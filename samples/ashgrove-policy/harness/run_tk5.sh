@@ -4,11 +4,11 @@
 # then run the batch twice on the same 24 policies: POLMAST unblocked (BLKSIZE=80, how production
 # has always allocated it) and blocked (BLKSIZE=800). Output: harness/work/{deck.jcl,job.out,results.txt}
 # ASHRLEN_MACRO=<file> assembles with a different copy of the shop macro (used to prove a proposed fix).
-# Runner: $COBC370_RUNNER (default tk5-run) takes <deck.jcl> <outfile>, as for the cobc370 test suite.
+# Runner: $COBC370_RUNNER (default tools/tk5-run) takes <deck.jcl> <outfile>, as for the cobc370 test suite.
 set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 work=${HARNESS_WORK:-$here/harness/work}; mkdir -p "$work"
-runner=${COBC370_RUNNER:-tk5-run}
+runner=${COBC370_RUNNER:-$here/tools/tk5-run}
 "$here/../../src/cobc370" "$here/src/PLCYBAT.cbl" -o "$work/PLCYBAT.asm"
 data=$(cat "$here/data/POLMAST.dat")
 {

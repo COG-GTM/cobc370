@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# tk5-start: IPL a TK5 (MVS 3.8j) guest under Hercules, unattended, and wait until it accepts jobs.
+# Env: TK5_HOME         TK5 install directory            (default ~/mvs-demo/mvs-tk5)
+#      HERCULES         Hercules binary                  (default ~/mvs-demo/hercules-install/bin/hercules, else PATH)
+#      TK5_CONSOLE_LOG  Hercules console log             (default $TK5_HOME/log/hercules-console.log)
+#      MVS_NAMESPACE    optional Linux network namespace that keeps ports 3505/8038 off the host (needs sudo -n)
+set -euo pipefail
+tk5=${TK5_HOME:-$HOME/mvs-demo/mvs-tk5}
+herc=${HERCULES:-$HOME/mvs-demo/hercules-install/bin/hercules}
+[ -x "$herc" ] || herc=$(command -v hercules) || { echo "tk5-start: Hercules not found; set HERCULES" >&2; exit 1; }
+[ -f "$tk5/conf/tk5.cnf" ] || { echo "tk5-start: no TK5 at $tk5; set TK5_HOME (see docs/TK5-SETUP.md)" >&2; exit 1; }
+log=${TK5_CONSOLE_LOG:-$tk5/log/hercules-console.log}
+pidf=$tk5/log/hercules.pid
+mkdir -p "$tk5/log" "$(dirname "$log")"
+if [ -s "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null; then
+  echo "tk5-start: already running (pid $(cat "$pidf"))"; exit 0
+fi
+touch "$log"; mark=$(wc -l <"$log")
+cd "$tk5"
+cmd=(env HERCULES_RC=scripts/ipl.rc TK5CONS=intcons REP101A=specific CMD101A=02 "$herc" -d -f conf/tk5.cnf)
+if [ -n "${MVS_NAMESPACE:-}" ]; then
+  sudo -n ip netns list | awk '{print $1}' | grep -qx "$MVS_NAMESPACE" || sudo -n ip netns add "$MVS_NAMESPACE"
+  sudo -n ip netns exec "$MVS_NAMESPACE" ip link set lo up
+  cmd=(sudo -n ip netns exec "$MVS_NAMESPACE" runuser -u "$(id -un)" -- "${cmd[@]}")
+fi
+nohup "${cmd[@]}" </dev/null >>"$log" 2>&1 &
+echo $! >"$pidf"
+for _ in $(seq 1 300); do
+  if tail -n +"$((mark + 1))" "$log" | grep -q "MVS038J.*system initialization complete"; then
+    echo "tk5-start: MVS 3.8j ready (pid $(cat "$pidf"), console log $log)"; exit 0
+  fi
+  kill -0 "$(cat "$pidf")" 2>/dev/null || { echo "tk5-start: Hercules exited; see $log" >&2; exit 1; }
+  sleep 1
+done
+echo "tk5-start: timed out waiting for IPL; see $log" >&2; exit 1

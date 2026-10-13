@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# tk5-stop: stop the Hercules process started by tk5-start (hard stop of the emulator; fine for this demo guest).
+set -euo pipefail
+tk5=${TK5_HOME:-$HOME/mvs-demo/mvs-tk5}
+pidf=$tk5/log/hercules.pid
+[ -s "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null || { echo "tk5-stop: not running"; rm -f "$pidf"; exit 0; }
+pid=$(cat "$pidf"); kill "$pid"
+for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+kill -0 "$pid" 2>/dev/null && kill -9 "$pid"
+rm -f "$pidf"; echo "tk5-stop: stopped"

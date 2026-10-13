@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# tk5-run <deck.jcl> <outfile>: a COBC370_RUNNER for a local TK5 guest started by tk5-start.
+# Sends the deck to the TK5 card reader (127.0.0.1:3505), waits for JES2 to report the job's output
+# printed ($HASP150; class Z output stays queued, so $HASP250 never comes), then writes what the job
+# added to the class A and class Z printer files (prt00e.txt, prt00f.txt) to <outfile>.
+# Env: TK5_HOME, TK5_CONSOLE_LOG, MVS_NAMESPACE as for tk5-start; TK5_READER_PORT (3505); TK5_TIMEOUT (180 s).
+# Decks carrying the cobc370 test-suite token @HERC01PW@ need TK5_JOB_PASSWORD in the environment; it is
+# substituted into a temporary copy only. The ashgrove-policy deck has no USER= and needs no credential.
+set -euo pipefail
+[ $# -eq 2 ] || { echo "usage: tk5-run <deck.jcl> <outfile>" >&2; exit 2; }
+deck=$1 out=$2
+tk5=${TK5_HOME:-$HOME/mvs-demo/mvs-tk5}
+log=${TK5_CONSOLE_LOG:-$tk5/log/hercules-console.log}
+port=${TK5_READER_PORT:-3505}
+prt=$tk5/prt
+[ -f "$log" ] || { echo "tk5-run: no console log at $log; start the guest with tk5-start" >&2; exit 1; }
+job=$(head -1 "$deck" | sed -E 's#^//([A-Z0-9@$#]+).*#\1#')
+src=$deck
+if grep -q '@HERC01PW@' "$deck"; then
+  [ -n "${TK5_JOB_PASSWORD:-}" ] || { echo "tk5-run: deck needs TK5_JOB_PASSWORD" >&2; exit 1; }
+  src=$(mktemp); trap 'rm -f "$src"' EXIT
+  sed "s|@HERC01PW@|$TK5_JOB_PASSWORD|g" "$deck" >"$src"
+fi
+declare -A before
+for f in "$prt/prt00e.txt" "$prt/prt00f.txt"; do before[$f]=$([ -f "$f" ] && stat -c %s "$f" || echo 0); done
+mark=$(wc -l <"$log")
+send="cat '$src' > /dev/tcp/127.0.0.1/$port"
+if [ -n "${MVS_NAMESPACE:-}" ]; then
+  sudo -n ip netns exec "$MVS_NAMESPACE" runuser -u "$(id -un)" -- bash -c "$send"
+else
+  bash -c "$send"
+fi
+done_=0
+for _ in $(seq 1 "${TK5_TIMEOUT:-180}"); do
+  tail -n +"$((mark + 1))" "$log" | grep -q "\$HASP150 $job " && { done_=1; break; }
+  sleep 1
+done
+[ "$done_" = 1 ] || { echo "tk5-run: timeout waiting for \$HASP150 $job" >&2; exit 1; }
+sleep 3; : >"$out"
+for f in "$prt/prt00e.txt" "$prt/prt00f.txt"; do
+  [ -f "$f" ] && tail -c +"$((before[$f] + 1))" "$f" >>"$out"
+done
+exit 0
