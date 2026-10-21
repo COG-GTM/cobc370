@@ -5,7 +5,8 @@
 # added to the class A and class Z printer files (prt00e.txt, prt00f.txt) to <outfile>.
 # Env: TK5_HOME, TK5_CONSOLE_LOG, MVS_NAMESPACE as for tk5-start; TK5_READER_PORT (3505); TK5_TIMEOUT (180 s).
 # Decks carrying the cobc370 test-suite token @HERC01PW@ need TK5_JOB_PASSWORD in the environment; it is
-# substituted into a temporary copy only. The ashgrove-policy deck has no USER= and needs no credential.
+# substituted on the way to the reader only. The ashgrove-policy deck has no USER= and needs no credential.
+# After capturing the output, the job is purged from JES2 by number (/*$PJn on the reader).
 set -euo pipefail
 [ $# -eq 2 ] || { echo "usage: tk5-run <deck.jcl> <outfile>" >&2; exit 2; }
 deck=$1 out=$2
@@ -15,29 +16,42 @@ port=${TK5_READER_PORT:-3505}
 prt=$tk5/prt
 [ -f "$log" ] || { echo "tk5-run: no console log at $log; start the guest with tk5-start" >&2; exit 1; }
 job=$(head -1 "$deck" | sed -E 's#^//([A-Z0-9@$#]+).*#\1#')
-src=$deck
-if grep -q '@HERC01PW@' "$deck"; then
-  [ -n "${TK5_JOB_PASSWORD:-}" ] || { echo "tk5-run: deck needs TK5_JOB_PASSWORD" >&2; exit 1; }
-  src=$(mktemp); trap 'rm -f "$src"' EXIT
-  perl -pe 's/\@HERC01PW\@/$ENV{TK5_JOB_PASSWORD}/g' "$deck" >"$src"
-fi
+case $port in ''|*[!0-9]*) echo "tk5-run: TK5_READER_PORT must be a number" >&2; exit 2;; esac
+# Feed stdin to the card reader. The deck path never enters a shell string, and a credentialed deck is
+# substituted in the pipe, so the password is never written to disk.
+send() {
+  if [ -n "${MVS_NAMESPACE:-}" ]; then
+    sudo -n ip netns exec "$MVS_NAMESPACE" runuser -u "$(id -un)" -- bash -c 'cat >"/dev/tcp/127.0.0.1/$1"' _ "$port"
+  else
+    cat >"/dev/tcp/127.0.0.1/$port"
+  fi
+}
 declare -A before
 for f in "$prt/prt00e.txt" "$prt/prt00f.txt"; do before[$f]=$([ -f "$f" ] && stat -c %s "$f" || echo 0); done
 mark=$(wc -l <"$log")
-send="cat '$src' > /dev/tcp/127.0.0.1/$port"
-if [ -n "${MVS_NAMESPACE:-}" ]; then
-  sudo -n ip netns exec "$MVS_NAMESPACE" runuser -u "$(id -un)" -- bash -c "$send"
+if grep -q '@HERC01PW@' "$deck"; then
+  [ -n "${TK5_JOB_PASSWORD:-}" ] || { echo "tk5-run: deck needs TK5_JOB_PASSWORD" >&2; exit 1; }
+  perl -pe 's/\@HERC01PW\@/$ENV{TK5_JOB_PASSWORD}/g' "$deck" | send
 else
-  bash -c "$send"
+  send <"$deck"
 fi
-done_=0
+jobno=
 for _ in $(seq 1 "${TK5_TIMEOUT:-180}"); do
-  tail -n +"$((mark + 1))" "$log" | grep -q "\$HASP150 $job " && { done_=1; break; }
+  jobno=$(tail -n +"$((mark + 1))" "$log" | sed -nE "s/.* JOB +([0-9]+) +\\\$HASP150 $job .*/\1/p" | tail -1)
+  [ -n "$jobno" ] && break
   sleep 1
 done
-[ "$done_" = 1 ] || { echo "tk5-run: timeout waiting for \$HASP150 $job" >&2; exit 1; }
+[ -n "$jobno" ] || { echo "tk5-run: timeout waiting for \$HASP150 $job" >&2; exit 1; }
 sleep 3; : >"$out"
 for f in "$prt/prt00e.txt" "$prt/prt00f.txt"; do
   [ -f "$f" ] && tail -c +"$((before[$f] + 1))" "$f" >>"$out"
 done
-exit 0
+# Purge this job (and only this job) so completed jobs do not pile up in the JES2 queue.
+mark=$(wc -l <"$log")
+printf '/*$PJ%s\n' "$jobno" | send
+for _ in $(seq 1 30); do
+  tail -n +"$((mark + 1))" "$log" | grep -qE " JOB +$jobno +\\\$HASP250 $job +IS PURGED" && exit 0
+  sleep 1
+done
+echo "tk5-run: output captured to $out, but JES2 did not confirm purge of $job JOB$jobno" >&2
+exit 1
