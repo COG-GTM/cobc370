@@ -4,7 +4,7 @@ set -euo pipefail
 tk5=${TK5_HOME:-$HOME/mvs-demo/mvs-tk5}
 pidf=$tk5/log/hercules.pid
 # Only signal the PID if it still has the start time tk5-start recorded (a reused PID is someone else's).
-read -r pid st _ <"$pidf" 2>/dev/null || true
+read -r pid st _ 2>/dev/null <"$pidf" || true
 if [ -z "${st:-}" ] || [ "$(awk '{print $22}' "/proc/$pid/stat" 2>/dev/null)" != "$st" ]; then
   echo "tk5-stop: not running"; rm -f "$pidf"; exit 0
 fi

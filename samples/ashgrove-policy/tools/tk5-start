@@ -16,7 +16,7 @@ pidf=$tk5/log/hercules.pid   # "<pid> <process start time> <console log line at 
 mkdir -p "$tk5/log" "$(dirname "$log")"
 starttime() { awk '{print $22}' "/proc/$1/stat" 2>/dev/null; }
 # Ours only if the PID is alive and still has the start time recorded at launch (guards against PID reuse).
-ours() { read -r p st _ <"$pidf" 2>/dev/null && [ -n "${st:-}" ] && [ "$(starttime "$p")" = "$st" ]; }
+ours() { read -r p st _ 2>/dev/null <"$pidf" && [ -n "${st:-}" ] && [ "$(starttime "$p")" = "$st" ]; }
 stop_guest() { read -r p _ <"$pidf"; kill "$p" 2>/dev/null || true
   for _ in $(seq 1 30); do kill -0 "$p" 2>/dev/null || break; sleep 1; done
   ! ours || kill -9 "$p" 2>/dev/null || true; rm -f "$pidf"; }

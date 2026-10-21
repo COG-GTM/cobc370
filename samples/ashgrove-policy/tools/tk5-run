@@ -46,11 +46,13 @@ sleep 3; : >"$out"
 for f in "$prt/prt00e.txt" "$prt/prt00f.txt"; do
   [ -f "$f" ] && tail -c +"$((before[$f] + 1))" "$f" >>"$out"
 done
-# Purge this job (and only this job) so completed jobs do not pile up in the JES2 queue.
-mark=$(wc -l <"$log")
+# Purge this job (and only this job) so completed jobs do not pile up in the JES2 queue. A job whose
+# output was all printed may already have been purged by JES2 itself.
+purged() { tail -n +"$((mark + 1))" "$log" | grep -qE " JOB +$jobno +\\\$HASP250 $job +IS PURGED"; }
+purged && exit 0
 printf '/*$PJ%s\n' "$jobno" | send
 for _ in $(seq 1 30); do
-  tail -n +"$((mark + 1))" "$log" | grep -qE " JOB +$jobno +\\\$HASP250 $job +IS PURGED" && exit 0
+  purged && exit 0
   sleep 1
 done
 echo "tk5-run: output captured to $out, but JES2 did not confirm purge of $job JOB$jobno" >&2
