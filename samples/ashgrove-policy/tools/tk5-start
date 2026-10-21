@@ -23,7 +23,7 @@ stop_guest() { read -r p _ <"$pidf"; kill "$p" 2>/dev/null || true
 wait_ready() {
   read -r p _ m <"$pidf"
   for _ in $(seq 1 300); do
-    if tail -n +"$((m + 1))" "$log" | grep -q "MVS038J.*system initialization complete"; then
+    if grep -q "MVS038J.*system initialization complete" < <(tail -n +"$((m + 1))" "$log"); then
       echo "tk5-start: MVS 3.8j ready (pid $p, console log $log)"; exit 0
     fi
     ours || { rm -f "$pidf"; echo "tk5-start: Hercules exited; see $log" >&2; exit 1; }
@@ -45,7 +45,7 @@ if [ "${TK5_EXPOSE:-0}" != 1 ]; then
 fi
 cmd=(env "${envs[@]}" TK5CONS=intcons REP101A=specific CMD101A=02 "$herc" -d -f conf/tk5.cnf)
 if [ -n "${MVS_NAMESPACE:-}" ]; then
-  sudo -n ip netns list | awk '{print $1}' | grep -qx "$MVS_NAMESPACE" || sudo -n ip netns add "$MVS_NAMESPACE"
+  grep -qx "$MVS_NAMESPACE" < <(sudo -n ip netns list | awk '{print $1}') || sudo -n ip netns add "$MVS_NAMESPACE"
   sudo -n ip netns exec "$MVS_NAMESPACE" ip link set lo up
   cmd=(sudo -n ip netns exec "$MVS_NAMESPACE" runuser -u "$(id -un)" -- "${cmd[@]}")
 fi

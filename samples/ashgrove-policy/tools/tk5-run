@@ -48,7 +48,8 @@ for f in "$prt/prt00e.txt" "$prt/prt00f.txt"; do
 done
 # Purge this job (and only this job) so completed jobs do not pile up in the JES2 queue. A job whose
 # output was all printed may already have been purged by JES2 itself.
-purged() { tail -n +"$((mark + 1))" "$log" | grep -qE " JOB +$jobno +\\\$HASP250 $job +IS PURGED"; }
+# grep reads via process substitution so an early grep -q exit (SIGPIPE in tail) cannot fail the match under pipefail.
+purged() { grep -qE " JOB +$jobno +\\\$HASP250 $job +IS PURGED" < <(tail -n +"$((mark + 1))" "$log"); }
 purged && exit 0
 printf '/*$PJ%s\n' "$jobno" | send
 for _ in $(seq 1 30); do
