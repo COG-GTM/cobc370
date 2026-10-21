@@ -1,0 +1,15 @@
+# IFOX00 listing excerpt: DCBD DSORG=PS,DEVD=DA assembled on TK5 (MVS 3.8j) from SYS1.MACLIB
+# columns: location counter (hex offset into IHADCB) | listing stmt | field
+000000                                6+IHADCB   DSECT , -            DCBPTR
+000020                              148+DCBEODAD DS    0A -           SAME AS DCBEODA BELOW
+000024                              178+DCBRECFM DS    BL1 -          RECORD FORMAT
+000028                              204+DCBDDNAM DS    CL8 -          NAME ON THE DD STATEMENT WHICH
+000030                              206+DCBOFLGS DS    BL1 -          FLAGS USED BY OPEN ROUTINE
+00002A                              336+DCBMACRF DS    0BL2 -         SAME AS DCBMACR BEFORE OPEN
+00002A                              337+DCBMACF1 DS    BL1 -          FIRST BYTE OF DCBMACRF
+00002B                              338+DCBMACF2 DS    BL1 -          SECOND BYTE OF DCBMACRF
+000030                              350+DCBOFLG  DS    BL1            SAME AS DCBOFLGS BEFORE OPEN
+000030                              357+DCBOFLG1 DS    BL1            SAME AS DCBOFLGS BEFORE OPEN
+00003E                              445+DCBBLKSI DS    H -            MAXIMUM BLOCK SIZE
+000052                              510+DCBLRECL DS    H -            LOGICAL RECORD LENGTH
+000052                              537+         DS    H -            DCBLRECL - LOGICAL RECORD LENG
