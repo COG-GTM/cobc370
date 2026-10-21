@@ -19,7 +19,7 @@ src=$deck
 if grep -q '@HERC01PW@' "$deck"; then
   [ -n "${TK5_JOB_PASSWORD:-}" ] || { echo "tk5-run: deck needs TK5_JOB_PASSWORD" >&2; exit 1; }
   src=$(mktemp); trap 'rm -f "$src"' EXIT
-  sed "s|@HERC01PW@|$TK5_JOB_PASSWORD|g" "$deck" >"$src"
+  perl -pe 's/\@HERC01PW\@/$ENV{TK5_JOB_PASSWORD}/g' "$deck" >"$src"
 fi
 declare -A before
 for f in "$prt/prt00e.txt" "$prt/prt00f.txt"; do before[$f]=$([ -f "$f" ] && stat -c %s "$f" || echo 0); done

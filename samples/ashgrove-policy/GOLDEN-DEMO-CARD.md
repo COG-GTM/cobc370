@@ -67,7 +67,7 @@ Setup notes are in [samples/ashgrove-policy/docs/TK5-SETUP.md](https://github.co
 - **Synthetic.** The routine, the macro and the offset bug were written for this demo. They say nothing about any production system and are not production-equivalent. The DCB offsets are real (from TK5's `SYS1.MACLIB`).
 - "The team confirms" is scripted: the confirmation in the demo is Devin's own reproduction on MVS plus the escalation, not a real platform team.
 - MVS 3.8j with IFOX00 is a public-domain predecessor of z/OS and HLASM. The DCB layout is the same; the assembler and operating system are older.
-- Ports: TK5 listens on 3270, 3505 and 8038. If those are taken or must not be exposed, set `MVS_NAMESPACE` to run the guest in a private network namespace (needs passwordless sudo).
+- Ports: `tools/tk5-start` binds the TK5 console (3270) and card reader (3505) to 127.0.0.1 and stops the Hercules web console (8038) at IPL. For full isolation, or if the ports are taken, set `MVS_NAMESPACE` to run the guest in a private network namespace (needs passwordless sudo).
 
 ## Discovery questions
 1. How many assembler routines are still called from your COBOL batch, and how many have a living owner?

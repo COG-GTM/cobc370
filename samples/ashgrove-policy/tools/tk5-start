@@ -3,7 +3,9 @@
 # Env: TK5_HOME         TK5 install directory            (default ~/mvs-demo/mvs-tk5)
 #      HERCULES         Hercules binary                  (default ~/mvs-demo/hercules-install/bin/hercules, else PATH)
 #      TK5_CONSOLE_LOG  Hercules console log             (default $TK5_HOME/log/hercules-console.log)
-#      MVS_NAMESPACE    optional Linux network namespace that keeps ports 3505/8038 off the host (needs sudo -n)
+#      MVS_NAMESPACE    optional Linux network namespace that keeps the guest's ports off the host (needs sudo -n)
+#      TK5_EXPOSE=1     keep TK5's own defaults (console 3270, card reader 3505 and web console 8038 on all interfaces).
+#                       Default: console and card reader bound to 127.0.0.1 and the Hercules web console stopped at IPL.
 set -euo pipefail
 tk5=${TK5_HOME:-$HOME/mvs-demo/mvs-tk5}
 herc=${HERCULES:-$HOME/mvs-demo/hercules-install/bin/hercules}
@@ -17,7 +19,13 @@ if [ -s "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null; then
 fi
 touch "$log"; mark=$(wc -l <"$log")
 cd "$tk5"
-cmd=(env HERCULES_RC=scripts/ipl.rc TK5CONS=intcons REP101A=specific CMD101A=02 "$herc" -d -f conf/tk5.cnf)
+envs=(HERCULES_RC=scripts/ipl.rc)
+if [ "${TK5_EXPOSE:-0}" != 1 ]; then
+  rc=$tk5/log/ashgrove-ipl.rc
+  { echo "http stop"; cat scripts/ipl.rc; } >"$rc"
+  envs=(HERCULES_RC="$rc" CNSLPORT="${CNSLPORT:-127.0.0.1:3270}" RDRPORT="${RDRPORT:-127.0.0.1:3505}")
+fi
+cmd=(env "${envs[@]}" TK5CONS=intcons REP101A=specific CMD101A=02 "$herc" -d -f conf/tk5.cnf)
 if [ -n "${MVS_NAMESPACE:-}" ]; then
   sudo -n ip netns list | awk '{print $1}' | grep -qx "$MVS_NAMESPACE" || sudo -n ip netns add "$MVS_NAMESPACE"
   sudo -n ip netns exec "$MVS_NAMESPACE" ip link set lo up

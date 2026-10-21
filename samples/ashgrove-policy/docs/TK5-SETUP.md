@@ -5,7 +5,9 @@ which are free downloads.
 
 ## One-time install
 1. Hercules 4.x (SDL Hyperion), built or packaged for your host: https://sdl-hercules-390.github.io/html/
-   Verified with 4.9.1.
+   Verified with 4.9.1. A source build defaults to `-march=native`, so a binary built on one CPU can die with
+   "Illegal instruction" on another (for example after a VM moves hosts); build portable with
+   `make CFLAGS="-O2 -march=x86-64 -pthread -D_GNU_SOURCE"` if the machine may change.
 2. TK5 (a ready-to-run MVS 3.8j system for Hercules): https://www.prince-webdesign.nl/tk5
    Unzip it, for example to `~/mvs-demo/mvs-tk5`. Verified with TK5 Update 5.
 3. Build the cobc370 compiler: `make -C src` (from the repository root).
@@ -33,6 +35,9 @@ No credential is needed: the sample's job card has no `USER=`. The runner substi
 `@HERC01PW@` token from `TK5_JOB_PASSWORD` only for decks that carry it.
 
 ## Ports and isolation
-TK5 listens on 3270 (terminals), 3505 (card reader) and 8038 (Hercules web console). If those are taken on
-the host, or should not be exposed, set `MVS_NAMESPACE=<name>` for both `tk5-start` and `tk5-run`: the guest
-then runs in a private Linux network namespace (needs passwordless `sudo`).
+TK5's own configuration listens on all interfaces: 3270 (terminals), 3505 (card reader) and 8038 (Hercules
+web console). By default `tk5-start` narrows this: the console and card reader bind to 127.0.0.1 only, and the
+web console is stopped as soon as Hercules reads its startup script (it may listen for a few seconds before that).
+`TK5_EXPOSE=1` keeps TK5's defaults. For full isolation, or if the ports are taken on the host, set
+`MVS_NAMESPACE=<name>` for both `tk5-start` and `tk5-run`: the guest then runs in a private Linux network
+namespace (needs passwordless `sudo`).
