@@ -5,11 +5,13 @@ tk5=${TK5_HOME:-$HOME/mvs-demo/mvs-tk5}
 pidf=$tk5/log/hercules.pid
 # Only signal the PID if it still has the start time tk5-start recorded (a reused PID is someone else's).
 read -r pid st _ 2>/dev/null <"$pidf" || true
-# An older tk5-start wrote only the PID: accept it only if that process is Hercules running in $tk5, where
-# tk5-start launches it (a reused PID belonging to another guest runs elsewhere and is left alone).
+# An older tk5-start wrote only the PID. Without a start time the PID cannot be proven to be this guest, so it
+# is never signalled: if it may be (Hercules running in $tk5, where tk5-start launches it), ask for manual cleanup.
 if [ -n "${pid:-}" ] && [ -z "${st:-}" ] && [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = hercules ] &&
   [ "$(readlink "/proc/$pid/cwd" 2>/dev/null)" = "$(cd "$tk5" 2>/dev/null && pwd -P)" ]; then
-  st=$(awk '{print $22}' "/proc/$pid/stat")
+  echo "tk5-stop: $pidf is from an older tk5-start (PID only), so Hercules pid $pid cannot be proven to be this guest;" >&2
+  echo "tk5-stop: not signalling it. If it is this guest, stop it yourself (kill $pid) and remove $pidf." >&2
+  exit 1
 fi
 if [ -z "${st:-}" ] || [ "$(awk '{print $22}' "/proc/$pid/stat" 2>/dev/null)" != "$st" ]; then
   echo "tk5-stop: not running"; rm -f "$pidf"; exit 0

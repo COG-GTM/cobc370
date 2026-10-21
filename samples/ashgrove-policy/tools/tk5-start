@@ -37,7 +37,8 @@ if [ -s "$pidf" ]; then
   # $tk5 (both versions launch from there); never launch a second guest beside it.
   if read -r p st _ 2>/dev/null <"$pidf" && [ -z "${st:-}" ] && [ "$(cat "/proc/$p/comm" 2>/dev/null)" = hercules ] &&
     [ "$(readlink "/proc/$p/cwd" 2>/dev/null)" = "$(cd "$tk5" && pwd -P)" ]; then
-    echo "tk5-start: Hercules pid $p (started by an older tk5-start) is still running; run tools/tk5-stop first" >&2; exit 1
+    echo "tk5-start: Hercules pid $p is running in $tk5 and $pidf is from an older tk5-start (PID only);" >&2
+    echo "tk5-start: not launching a second guest. If pid $p is the old guest, stop it (kill $p) and remove $pidf." >&2; exit 1
   fi
   echo "tk5-start: removing stale $pidf"; rm -f "$pidf"
 fi
