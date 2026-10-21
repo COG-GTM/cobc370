@@ -5,6 +5,10 @@ tk5=${TK5_HOME:-$HOME/mvs-demo/mvs-tk5}
 pidf=$tk5/log/hercules.pid
 # Only signal the PID if it still has the start time tk5-start recorded (a reused PID is someone else's).
 read -r pid st _ 2>/dev/null <"$pidf" || true
+# A PID file from an older tk5-start holds only the PID: accept it only if that process is Hercules.
+if [ -n "${pid:-}" ] && [ -z "${st:-}" ] && [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = hercules ]; then
+  st=$(awk '{print $22}' "/proc/$pid/stat")
+fi
 if [ -z "${st:-}" ] || [ "$(awk '{print $22}' "/proc/$pid/stat" 2>/dev/null)" != "$st" ]; then
   echo "tk5-stop: not running"; rm -f "$pidf"; exit 0
 fi
