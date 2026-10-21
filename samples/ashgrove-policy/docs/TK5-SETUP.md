@@ -27,8 +27,8 @@ samples/ashgrove-policy/tools/tk5-stop                  # optional; leave the gu
   `$TK5_HOME/log/hercules-console.log`, and waits for the `MVS038J` ready message. If the guest is already
   running it waits for that same message; if IPL does not finish in 300 s it stops the guest. The PID file
   records the process start time, so a stale file is never mistaken for a running guest. A PID-only file left
-  by an older `tk5-start` is honoured if that process is still Hercules: `tk5-start` refuses to launch a second
-  guest and `tk5-stop` stops it.
+  by an older `tk5-start` is honoured only if that process is Hercules running in `$TK5_HOME` (where both versions
+  launch it): `tk5-start` refuses to launch a second guest and `tk5-stop` stops it. Otherwise the file is stale.
 - `tools/tk5-run <deck.jcl> <outfile>` is the `COBC370_RUNNER` (see the repository README, "Running the tests").
   It sends the deck to the TK5 card reader on 127.0.0.1:3505, waits for JES2's `$HASP150` message for the
   job (class Z output stays queued, so `$HASP250` never arrives), and copies what the job printed

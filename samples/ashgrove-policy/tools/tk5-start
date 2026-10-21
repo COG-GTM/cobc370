@@ -33,8 +33,10 @@ wait_ready() {
 }
 if [ -s "$pidf" ]; then
   ours && wait_ready
-  # A PID file from an older tk5-start holds only the PID; never launch a second guest beside a live one.
-  if read -r p st _ 2>/dev/null <"$pidf" && [ -z "${st:-}" ] && [ "$(cat "/proc/$p/comm" 2>/dev/null)" = hercules ]; then
+  # An older tk5-start wrote only the PID. Treat it as this guest only if that process is Hercules running in
+  # $tk5 (both versions launch from there); never launch a second guest beside it.
+  if read -r p st _ 2>/dev/null <"$pidf" && [ -z "${st:-}" ] && [ "$(cat "/proc/$p/comm" 2>/dev/null)" = hercules ] &&
+    [ "$(readlink "/proc/$p/cwd" 2>/dev/null)" = "$(cd "$tk5" && pwd -P)" ]; then
     echo "tk5-start: Hercules pid $p (started by an older tk5-start) is still running; run tools/tk5-stop first" >&2; exit 1
   fi
   echo "tk5-start: removing stale $pidf"; rm -f "$pidf"
